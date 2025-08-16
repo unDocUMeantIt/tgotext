@@ -14,10 +14,12 @@ go build ./cmd/tgotext
 
 ## Usage
 
-Assuming the build went well, `tgotext` currently only has one command: `parse`. It expects the path to a template file as an argument, and offers the `--object` flag to specify the name of the `Locale` object that is referenced in the template. That is, if you named your `Locale` object `Loc` and therefore use like `{{ .Loc.Get "Your text goes here!" }}` in a template file called `/tmp/my_template.tpl.html`, you would call:
+Assuming the build went well, `tgotext` currently only has one command: `parse`. It expects the path to a template file as an argument, and offers the `--object` flag to specify the name of the `Locale` object that is referenced in the template. That is, if you named your `Locale` object `Loc` and therefore use like `{{ .Loc.Get "Your text goes here!" }}` or `{{ $.Loc.Get "Your text goes here!" }}` in a template file called `/tmp/my_template.tpl.html`, you would call:
 
 ```bash
-tgotext parse /tmp/my_template.tpl.html --object Loc > /tmp/default.pot
+tgotext parse /tmp/my_template.tpl.html --object .Loc > /tmp/default.pot
+# Or for templates using the root context:
+tgotext parse /tmp/my_template.tpl.html --object $.Loc > /tmp/default.pot
 ```
 
 The tool doesn't write files directly, it only prints to `stdout` so you can redirect the output as you like.

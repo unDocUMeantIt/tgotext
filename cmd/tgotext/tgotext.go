@@ -36,7 +36,7 @@ msgstr ""
 	cmdParse := &cobra.Command{
 		Use:   "parse [template file to parse]",
 		Short: "Parse a template file for translatable strings",
-		Long:  "The given template file is checked for all instances of \"{{ ." + objName + ".Get \"<text>\" }}\".",
+		Long:  "The given template file is checked for all instances of \"{{ " + objName + ".Get \"<text>\" }}\".",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			f, err := os.Open(args[0])
@@ -45,7 +45,7 @@ msgstr ""
 			}
 			defer f.Close()
 
-			re := regexp.MustCompile(`\{\{\s*.` + objName + `.Get "(.*)"\s*\}\}`)
+			re := regexp.MustCompile(`(?s)\{\{.*?` + regexp.QuoteMeta(objName) + `\.Get\s+"((?:[^"\\]|\\.)*)"\s*.*?\}\}`)
 
 			fScanner := bufio.NewScanner(f)
 			fScanner.Split(bufio.ScanLines)
@@ -55,17 +55,45 @@ msgstr ""
 				fmt.Println(POTHeader)
 			}
 
-			lineNumber := 1
+			var (
+				lineNumber = 1
+
+				buffer            string
+				inTemplate        bool
+				templateStartLine int
+			)
 			for fScanner.Scan() {
-				stringsFound := re.FindAllStringSubmatch(fScanner.Text(), -1)
-				for i := 0; i < len(stringsFound); i++ {
-					fmt.Printf("#: %s:%d\nmsgid %q\nmsgstr \"\"\n\n", path.Base(args[0]), lineNumber, stringsFound[i][1])
+				line := fScanner.Text()
+
+				if !inTemplate && regexp.MustCompile(`\{\{`).MatchString(line) {
+					inTemplate = true
+					templateStartLine = lineNumber
+					buffer = line + "\n"
+				} else if inTemplate {
+					buffer += line + "\n"
 				}
+
+				if inTemplate && regexp.MustCompile(`\}\}`).MatchString(line) {
+					stringsFound := re.FindAllStringSubmatch(buffer, -1)
+					for _, match := range stringsFound {
+						fmt.Printf("#: %s:%d\nmsgid %q\nmsgstr \"\"\n\n", path.Base(args[0]), templateStartLine, match[1])
+					}
+					buffer = ""
+					inTemplate = false
+				}
+
+				if !inTemplate {
+					stringsFound := re.FindAllStringSubmatch(line, -1)
+					for _, match := range stringsFound {
+						fmt.Printf("#: %s:%d\nmsgid %q\nmsgstr \"\"\n\n", path.Base(args[0]), lineNumber, match[1])
+					}
+				}
+
 				lineNumber++
 			}
 		},
 	}
-	cmdParse.Flags().StringVarP(&objName, "object", "o", objName, "The name of the Locale object used in the template (without dot prefix!)")
+	cmdParse.Flags().StringVarP(&objName, "object", "o", objName, "The name of the Locale object used in the template (e.g., 'Locale', '.Locale', '$.Locale')")
 	rootCmd.PersistentFlags().Bool("header", false, "Print POT header")
 	rootCmd.AddCommand(cmdParse)
 
